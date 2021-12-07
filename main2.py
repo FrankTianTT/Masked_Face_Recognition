@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     #######################################################################################
     #########################################config#######################################
-    BATCH_SIZE=128
+    BATCH_SIZE = 128
     NUM_WORKERS = multiprocessing.cpu_count()
     embedding_size = 512
     num_classes = df_train.target.nunique()
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # 'arcface' or 'triplet'
     loss_fn = 'arcface'
     # global gem or None(avgerage pooling)
-    pool='gem'
+    pool = 'gem'
     # Cyclic or Step
     scheduler_name = 'multistep'
     # sgd or None(adam) or rmsprop
@@ -58,27 +58,33 @@ if __name__ == "__main__":
     eval_dataset2 = customized_dataset(df_eval2, mode='eval')
     test_dataset = customized_dataset(df_test, mode='test')
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, drop_last=False)
-    eval_loader1 = DataLoader(eval_dataset1, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, drop_last=False)
-    eval_loader2 = DataLoader(eval_dataset2, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, drop_last=False)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, drop_last=False)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
+                              drop_last=False)
+    eval_loader1 = DataLoader(eval_dataset1, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
+                              drop_last=False)
+    eval_loader2 = DataLoader(eval_dataset2, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
+                              drop_last=False)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
+                             drop_last=False)
 
     # class_weights for arcface loss
     val_counts = df_train.target.value_counts().sort_index().values
-    class_weights = 1/np.log1p(val_counts)
+    class_weights = 1 / np.log1p(val_counts)
     class_weights = (class_weights / class_weights.sum()) * num_classes
     class_weights = torch.tensor(class_weights, dtype=torch.float32)
     # arcface
     metric_crit = ArcFaceLoss(arcface_s, arcface_m, crit, weight=class_weights, class_weights_norm=class_weights_norm)
-    facenet = FaceNet2(num_classes=num_classes, model_name=model_name, pool=pool, embedding_size=embedding_size, dropout=dropout, device=device, pretrain=pretrain)
-    optimizer = get_Optimizer2(facenet, metric_crit, optimizer_type, lr, weight_decay) # optimizer
-    scheduler = get_Scheduler(optimizer, lr, scheduler_name) # scheduler
+    facenet = FaceNet2(num_classes=num_classes, model_name=model_name, pool=pool, embedding_size=embedding_size,
+                       dropout=dropout, device=device, pretrain=pretrain)
+    optimizer = get_Optimizer2(facenet, metric_crit, optimizer_type, lr, weight_decay)  # optimizer
+    scheduler = get_Scheduler(optimizer, lr, scheduler_name)  # scheduler
     # load previous trained model
     if False:
         facenet, optimizer, scheduler = load(name)
         facenet.to(device)
     # train
-    train2(facenet.to(device),train_loader,eval_loader1,eval_loader2,metric_crit,optimizer,scheduler,num_epochs,eval_every,num_classes,device,name)
+    train2(facenet.to(device), train_loader, eval_loader1, eval_loader2, metric_crit, optimizer, scheduler, num_epochs,
+           eval_every, num_classes, device, name)
     dist_threshold = evalulate(facenet, eval_loader1, eval_loader2, device, loss_fn)
-    print('Distance threshold:',dist_threshold)
-    test(facenet,test_loader,dist_threshold,device, loss_fn)
+    print('Distance threshold:', dist_threshold)
+    test(facenet, test_loader, dist_threshold, device, loss_fn)
