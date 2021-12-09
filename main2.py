@@ -11,17 +11,21 @@ import pandas as pd
 from torch.utils.data import DataLoader
 import multiprocessing
 from arcface import ArcFaceLoss
+from tqdm import tqdm
 
-if __name__ == "__main__":
+BATCH_SIZE = 128
+NUM_WORKERS = multiprocessing.cpu_count()
+
+
+def train():
     df_train = pd.read_csv('train.csv')
     df_eval1 = pd.read_csv('eval_same.csv')
     df_eval2 = pd.read_csv('eval_diff.csv')
-    df_test = pd.read_csv('test.csv')
+    # df_test = pd.read_csv('test.csv')
 
     #######################################################################################
     #########################################config#######################################
-    BATCH_SIZE = 128
-    NUM_WORKERS = multiprocessing.cpu_count()
+
     embedding_size = 512
     num_classes = df_train.target.nunique()
     weight_decay = 5e-4
@@ -50,13 +54,13 @@ if __name__ == "__main__":
     name = 'arcface.pth'
     #######################################################################################
     #######################################################################################
-    device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(device)
 
     train_dataset = customized_dataset(df_train, mode='train')
     eval_dataset1 = customized_dataset(df_eval1, mode='eval')
     eval_dataset2 = customized_dataset(df_eval2, mode='eval')
-    test_dataset = customized_dataset(df_test, mode='test')
+    # test_dataset = customized_dataset(df_test, mode='test')
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
                               drop_last=False)
@@ -64,8 +68,8 @@ if __name__ == "__main__":
                               drop_last=False)
     eval_loader2 = DataLoader(eval_dataset2, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
                               drop_last=False)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
-                             drop_last=False)
+    # test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
+    #                          drop_last=False)
 
     # class_weights for arcface loss
     val_counts = df_train.target.value_counts().sort_index().values
@@ -74,17 +78,38 @@ if __name__ == "__main__":
     class_weights = torch.tensor(class_weights, dtype=torch.float32)
     # arcface
     metric_crit = ArcFaceLoss(arcface_s, arcface_m, crit, weight=class_weights, class_weights_norm=class_weights_norm)
-    facenet = FaceNet2(num_classes=num_classes, model_name=model_name, pool=pool, embedding_size=embedding_size,
-                       dropout=dropout, device=device, pretrain=pretrain)
+
+    # facenet = FaceNet2(num_classes=num_classes, model_name=model_name, pool=pool, embedding_size=embedding_size,
+    #                    dropout=dropout, device=device, pretrain=pretrain)
+    facenet = torch.load('./models/load.pth')
+    facenet.model.freeze(3)
+
     optimizer = get_Optimizer2(facenet, metric_crit, optimizer_type, lr, weight_decay)  # optimizer
     scheduler = get_Scheduler(optimizer, lr, scheduler_name)  # scheduler
     # load previous trained model
-    if False:
-        facenet, optimizer, scheduler = load(name)
-        facenet.to(device)
+    # facenet, optimizer, scheduler = load(name)
+    # facenet.to(device)
+
     # train
     train2(facenet.to(device), train_loader, eval_loader1, eval_loader2, metric_crit, optimizer, scheduler, num_epochs,
            eval_every, num_classes, device, name)
     dist_threshold = evalulate(facenet, eval_loader1, eval_loader2, device, loss_fn)
     print('Distance threshold:', dist_threshold)
-    test(facenet, test_loader, dist_threshold, device, loss_fn)
+    # test(facenet, test_loader, dist_threshold, device, loss_fn)
+
+
+def detect_dataset():
+    df_train = pd.read_csv('train.csv')
+    df_eval1 = pd.read_csv('eval_same.csv')
+    df_eval2 = pd.read_csv('eval_diff.csv')
+    train_dataset = customized_dataset(df_train, mode='train')
+    eval_dataset1 = customized_dataset(df_eval1, mode='eval')
+    eval_dataset2 = customized_dataset(df_eval2, mode='eval')
+    # train_dataset.detection()
+    eval_dataset1.detection()
+    eval_dataset2.detection()
+
+
+if __name__ == "__main__":
+    # detect_dataset()
+    train()
