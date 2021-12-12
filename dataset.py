@@ -1,10 +1,12 @@
 import os
 
+import numpy as np
 from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
 import pandas as pd
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 
 class customized_dataset(Dataset):
@@ -29,6 +31,15 @@ class customized_dataset(Dataset):
         return self.df.shape[0]
 
     def __getitem__(self, index: int):
+        if self.mode == 'test':
+            image_path = self.df.iloc[index]['path']
+            pair_path = self.df.iloc[index]['pair_path']
+            img = Image.open(image_path).convert("RGB")
+            pair_img = Image.open(pair_path).convert("RGB")
+            img = self.transforms_train(img)
+            pair_img = self.transforms_test(pair_img)
+            return {'image': img, 'pair_image': pair_img}
+
         # target label
         target = self.df.iloc[index]['target']
         image_path = self.df.iloc[index]['path']
@@ -58,3 +69,21 @@ class customized_dataset(Dataset):
         for i in tqdm(range(len(self))):
             if not self.is_exist(i):
                 print(i)
+
+    def show(self, index, pred, path):
+        image_path = self.df.iloc[index]['path']
+        pair_path = self.df.iloc[index]['pair_path']
+        img = Image.open(image_path).convert("RGB")
+        pair_img = Image.open(pair_path).convert("RGB")
+        img = np.asarray(img) / 255
+        pair_img = np.asarray(pair_img) / 255
+
+        fig, axs = plt.subplots(1, 2)
+        fig.suptitle("pred: {}".format(bool(pred)))
+        axs[0].axis('off')
+        axs[0].imshow(img)
+        axs[1].axis('off')
+        axs[1].imshow(pair_img)
+
+        plt.savefig(path)
+        plt.close()

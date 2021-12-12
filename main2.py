@@ -3,7 +3,7 @@ from model import FaceNet2
 from util import get_Optimizer2, get_Scheduler, get_Sampler
 from sampler import samples
 from train import train2, load
-from test import evalulate, test
+from test import evalulate, test, predict
 import numpy as np
 
 import torch
@@ -21,7 +21,6 @@ def train():
     df_train = pd.read_csv('train.csv')
     df_eval1 = pd.read_csv('eval_same.csv')
     df_eval2 = pd.read_csv('eval_diff.csv')
-    # df_test = pd.read_csv('test.csv')
 
     #######################################################################################
     #########################################config#######################################
@@ -51,7 +50,7 @@ def train():
     # focal or bce
     crit = "focal"
     # name of the model to be saved or loaded
-    name = 'arcface.pth'
+    name = 'arcface_en.pth'
     #######################################################################################
     #######################################################################################
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -60,7 +59,6 @@ def train():
     train_dataset = customized_dataset(df_train, mode='train')
     eval_dataset1 = customized_dataset(df_eval1, mode='eval')
     eval_dataset2 = customized_dataset(df_eval2, mode='eval')
-    # test_dataset = customized_dataset(df_test, mode='test')
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
                               drop_last=False)
@@ -68,8 +66,6 @@ def train():
                               drop_last=False)
     eval_loader2 = DataLoader(eval_dataset2, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
                               drop_last=False)
-    # test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
-    #                          drop_last=False)
 
     # class_weights for arcface loss
     val_counts = df_train.target.value_counts().sort_index().values
@@ -95,7 +91,6 @@ def train():
            eval_every, num_classes, device, name)
     dist_threshold = evalulate(facenet, eval_loader1, eval_loader2, device, loss_fn)
     print('Distance threshold:', dist_threshold)
-    # test(facenet, test_loader, dist_threshold, device, loss_fn)
 
 
 def detect_dataset():
@@ -110,6 +105,40 @@ def detect_dataset():
     eval_dataset2.detection()
 
 
+def run():
+    name = 'arcface_en.pth'
+    loss_fn = 'arcface'
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(device)
+
+    df_test = pd.read_csv('assess.csv')
+    df_eval1 = pd.read_csv('eval_same.csv')
+    df_eval2 = pd.read_csv('eval_diff.csv')
+
+    test_dataset = customized_dataset(df_test, mode='test')
+    eval_dataset1 = customized_dataset(df_eval1, mode='eval')
+    eval_dataset2 = customized_dataset(df_eval2, mode='eval')
+
+    eval_loader1 = DataLoader(eval_dataset1, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
+                              drop_last=False)
+    eval_loader2 = DataLoader(eval_dataset2, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
+                              drop_last=False)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS,
+                             drop_last=False)
+    facenet, optimizer, scheduler = load(name)
+
+    # dist_threshold = evalulate(facenet, eval_loader1, eval_loader2, device, loss_fn)
+    # dist_threshold = 1.0299999713897705
+    dist_threshold = 1.0699999332427979
+    print('Distance threshold:', dist_threshold)
+    # predict(facenet, test_dataset, test_loader, dist_threshold, device, loss_fn)
+    #
+    test(facenet, eval_loader1, dist_threshold, device, loss_fn)
+    test(facenet, eval_loader2, dist_threshold, device, loss_fn)
+
+
 if __name__ == "__main__":
     # detect_dataset()
-    train()
+    # train()
+    run()
